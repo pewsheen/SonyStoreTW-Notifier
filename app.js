@@ -24,7 +24,13 @@ const itemList = [
 ];
 
 function runRequest(item) {
-    request(`http://store.sony.com.tw/product/show/${item.id}`, function (error, response, body) {
+    let options = {
+        url: `https://store.sony.com.tw/product/show/${item.id}`,
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/38.0.2125.111 Safari/537.36'
+        }
+    }
+    request(options, function (error, response, body) {
         let time = new Date();
 
         if (!response || response.statusCode !== 200) {
