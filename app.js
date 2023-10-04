@@ -1,64 +1,84 @@
-const request = require('request');
-const TelegramBot = require('node-telegram-bot-api');
-
+const axios = require('axios');
+const { Telegraf } = require('telegraf');
+const { fmt, link } = require("telegraf/format");
 
 /* Telegram Bot Settings */
 const chatId = '';
 const token = '';
-const bot = new TelegramBot(token, {polling: false});
+const bot = new Telegraf(token);
+
+let running = true;
+
+bot.hears('stop', (ctx) => {
+    running = false;
+    ctx.reply('Stopping bot...');
+});
+bot.hears('start', (ctx) => {
+    ctx.reply('Starting bot...');
+    running = true;
+    runLoop();
+});
+bot.launch();
 
 /* Runtime Settings */
-const interval = 30000;
-const timeBias = 30000;
+const interval = 5000;
+const timeBias = 1000;
 
 /* Watch Tower */
 const itemList = [
     {
-        name: 'SEL24F14GM',
-        id: 'ff8080816643644a0166661218cf10cd',
+        name: 'α7CR (黑)',
+        id: 'ff8080818a0213c7018a40b40ddf37f2',
     },
     {
-        name: 'SEL100F28GM',
-        id: '8a818bb95a464b07015a49fab83a2ef6',
+        name: 'α7CR (銀)',
+        id: 'ff8080818a0213c7018a40b2282137ed',
     },
+    {
+        name: 'α7C II (黑)',
+        id: 'ff8080818a0213c7018a40a2a31637df',
+    }
 ];
 
-function runRequest(item) {
-    let options = {
-        url: `https://store.sony.com.tw/product/show/${item.id}`,
-        headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/38.0.2125.111 Safari/537.36'
-        }
-    }
-    request(options, function (error, response, body) {
-        let time = new Date();
+async function runRequest(item) {
+    try {
+        const url = `https://store.sony.com.tw/product/show/${item.id}`;
+        const response = await axios.get(url, {
+            headers: {
+                'User-Agent':
+                    'Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/38.0.2125.111 Safari/537.36',
+            },
+        });
 
-        if (!response || response.statusCode !== 200) {
-            console.log('Failed to get response');
-            console.log(time, item.name, error, response.statusCode, body);
-            return;
-        }
-
-        if (body.includes('放入購物車', 0)) {
-            console.log(time, item.name, 'On stuck!!');
-            bot.sendMessage(chatId, `${item.name} has stock`);
+        if (response.data.includes('"加入購物車"', 0)) {
+            console.log(`${item.name} on stuck`);
+            bot.telegram.sendMessage(
+                chatId,
+                fmt`[${item.name}] 到貨囉！ ${link('進入商品頁', url)}`
+            );
         } else {
-            console.log(time, item.name, 'Out of stuck!');
+            console.log(item.name, '-');
         }
-    });
+    } catch (error) {
+        console.error(error);
+    }
 }
 
 function checkItemsStatus() {
+    if (running === false) {
+        return;
+    }
     for (let index in itemList) {
         runRequest(itemList[index]);
     }
-};
+}
 
 function runLoop() {
+    if (running === false) {
+        return;
+    }
     setTimeout(() => {
         checkItemsStatus();
         runLoop();
-    }, (interval+Math.random()*timeBias));
+    }, interval + Math.random() * timeBias);
 }
-
-runLoop();
